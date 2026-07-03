@@ -1,0 +1,49 @@
+controls:
+  egress-default-deny:
+    kubernetes: 'NetworkPolicy (or Cilium/Calico equivalent) with policyTypes [Egress] selecting the workload,
+      default-deny posture, allow-list containing no 0.0.0.0/0 or uncontrolled destinations; verified
+      per workload from the policy objects.
+
+      '
+    vm-systemd: 'Security group / VPC firewall egress rules for the instance''s groups: no 0.0.0.0/0 egress
+      allow; allow-list attributed. Host-level nftables or systemd IPAddressDeny acceptable with config
+      export.
+
+      '
+    aws-managed: SG egress rules on the service ENIs (Lambda VPC config, RDS SG)
+    gcp-managed: VPC egress firewall rules / VPC-SC perimeter for the connector
+  no-shell-image:
+    kubernetes: 'image layer inspection: no /bin/sh, /bin/bash, busybox, or interpreter binaries in the
+      running image (scanner-verified per image digest)'
+    vm-systemd: not generally applicable (full OS); a chroot/container-confined service with no shell
+      may qualify with filesystem export
+    aws-managed: Lambda custom runtime images subject to the same layer inspection
+    gcp-managed: Cloud Run images subject to the same layer inspection
+  least-privilege-db-grant:
+    any-postgres: 'Grants dump artifact (information_schema/pg_catalog queries): role has no superuser/rds_superuser/cloudsqlsuperuser,
+      no CREATEROLE, single-schema privileges, no untrusted-language or file functions. Identical mechanics
+      on RDS, Aurora, Cloud SQL, AlloyDB, self-managed.
+
+      '
+    any-mysql: 'SHOW GRANTS dump: single-database privileges, no SUPER/FILE/PROCESS'
+  route-rate-limit:
+    kubernetes: 'Enforced limit on the delivering route: nginx-ingress limit-rps/limit-rpm annotations,
+      Envoy/Istio local_ratelimit or Gateway API policy; config read per route, matched against tainted
+      inbound routes from the dataflow map.
+
+      '
+    vm-systemd: ALB + WAF rate-based rule / CloudFront + WAF; Cloud Armor rate_based_ban on the backend
+      service; nginx limit_req in exported config
+    aws-managed: API Gateway throttling config; WAF rate rules on the ALB fronting the service
+    gcp-managed: Cloud Armor rate limiting on the backend service; API Gateway quota config
+  blocking-runtime-protection:
+    any: EDR/RASP policy export proving blocking (not detect-only) mode for the asset's policy group;
+      per-CVE efficacy remains cited evidence
+  selinux-confinement:
+    vm-systemd: 'getenforce=Enforcing plus per-process domain evidence (ps -Z export or policy query showing
+      the service''s domain is confined). STIG RHEL-08-010450 is the policy precondition only -- it never
+      earns the credit by itself.
+
+      '
+    kubernetes: RHEL/CoreOS nodes run containers as confined container_t by default; verify node SELinux
+      enforcing plus absence of spc_t/privileged escapes on the workload

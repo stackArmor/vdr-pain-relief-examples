@@ -1,0 +1,227 @@
+# PAIN Relief -- public illustrative examples (6 rows).
+# The standard, auditable row format. The maintained catalog is proprietary;
+# these six are an existence proof of the format, not the full table.
+rows:
+- id: CC-NET-EGRESS-DENY
+  title: Egress control impedes staged and out-of-band exploit completion
+  control:
+    name: egress-default-deny
+  counters:
+    cweClasses:
+    - CWE-917
+    - CWE-94
+    - CWE-829
+    - CWE-98
+    rationale: 'These classes complete by fetching or contacting something the attacker controls: JNDI/EL
+      lookups dial out (Log4Shell''s LDAP/RMI stage), staged code injection and remote file inclusion
+      fetch a second stage. Egress control removes or narrows the outbound leg, so the trigger fires but
+      the chain is less likely to complete. This is a LIKELIHOOD control, not impact: it does not cap
+      the harm of a successful exploit (RCE stays RCE), it lowers the probability of completion -- and
+      an attacker who routes around it (DNS exfil, an allowed domain, domain fronting) gets full impact.
+      Efficacy is therefore config-dependent, expressed as tiers.
+
+      '
+  credit:
+    lane: likelihood
+    metrics:
+    - LEV
+    move: epss-residual
+    scope: shared-infrastructure
+    residualTiers:
+    - capability: port-restricted
+      residualFactor: 0.9
+      verify: egress denied except tcp/80,443 to 0.0.0.0/0 (IP-allowlisting web ports is impractical,
+        so 0/0 on 80/443 is standard practice; destination control comes from domain/SNI filtering at
+        higher tiers). Blocks non-web second-stage ports (LDAP 389, RMI 1099) but leaves HTTP(S) fetch
+        and DNS open
+    - capability: sni-filter-no-dns-validation
+      residualFactor: 0.8
+      verify: SNI/domain allowlist on egress, but no validation that SNI matches the resolved destination
+        (SNI spoofing possible)
+    - capability: sni-filter-dns-validated
+      residualFactor: 0.7
+      verify: SNI/domain allowlist with DNS-resolution validation; domain fronting still possible
+    - capability: break-and-inspect
+      residualFactor: 0.5
+      verify: outbound TLS decrypt + Host-header inspection; catches domain fronting (SNI=allowed CDN,
+        Host=attacker); deepest tier
+    conditions:
+    - 'the verified tier is selected from the enforced egress capability; a shared egress firewall/proxy
+      discovered on the network path applies to every workload behind it (scope: shared-infrastructure)'
+    disqualifiers:
+    - DNS resolution to arbitrary names left open when the class can exfil/stage over DNS (e.g. JNDI dns://)
+      -- the tier does not hold for that path
+    - in-cluster or in-VPC attacker-influenceable service reachable on the allowed egress set (stage can
+      be hosted inside)
+  confidence: medium
+  notes: 'Egress control breaks a required STEP; it does not bound the outcome (discriminator: on full
+    success despite the control the impact is still full), which is why it is a likelihood control. CWE-918
+    (SSRF) is deliberately absent -- SSRF targets are internal; see CC-NET-IMDS-PROTECT. Residual factors
+    are illustrative, back-test pending.
+
+    '
+  provenance:
+    version: 2
+    status: active
+- id: CC-DATA-LEASTPRIV-SQL
+  title: Least-privilege single-schema credential bounds SQL injection
+  control:
+    name: least-privilege-db-grant
+  counters:
+    cweClasses:
+    - CWE-89
+    rationale: "A SQL injection executes with the application credential's authority. A grant confined\
+      \ to a single schema with no superuser, no cross-database access, and no file/extension privileges\
+      \ bounds what the payload can read or write to that schema: the injection still fires, it reaches\
+      \ less (memo row-mover, made automatic). Verified from a grants dump \u2014 pg_catalog / information_schema\
+      \ queries work the same on RDS, Cloud SQL, and self-managed engines.\n"
+  credit:
+    lane: impact
+    metrics:
+    - MC
+    - MI
+    move: high-to-low
+    conditions:
+    - grants dump artifact current within the governed refresh window
+    - no role inheritance path to broader privileges (verified in the same dump)
+    disqualifiers:
+    - the single schema IS the crown-jewel data the asset exists to protect (the bound and the blast radius
+      coincide -- no credit)
+  confidence: high
+  provenance:
+    version: 1
+    status: active
+- id: CC-RUN-DISTROLESS
+  title: No shell in image counters command injection
+  control:
+    name: no-shell-image
+  counters:
+    cweClasses:
+    - CWE-78
+    - CWE-77
+    rationale: 'OS command injection executes through a shell or command interpreter. An image with no
+      /bin/sh and no interpreter (distroless, scratch, Lambda provided.al2-style custom runtimes without
+      a shell) has nothing to run the injected command line; the vulnerable call fails rather than executes.
+
+      '
+  credit:
+    lane: impact
+    metrics:
+    - MC
+    - MI
+    move: high-to-low
+    conditions: []
+    disqualifiers:
+    - shell or interpreter reachable via mounted volume, shared sidecar filesystem, or language runtime
+      exec facilities the CVE targets directly
+  confidence: high
+  notes: 'Where the vulnerable code path demonstrably requires the absent binary, the stronger per-finding
+    claim is a VEX code_not_present disposition; this row is the conservative automatic credit.
+
+    '
+  provenance:
+    version: 1
+    status: active
+- id: CC-RATELIMIT-CONSUMPTION
+  title: Route rate limiting counters sustained-consumption DoS
+  control:
+    name: route-rate-limit
+  counters:
+    cweClasses:
+    - CWE-400
+    - CWE-1333
+    - CWE-770
+    - CWE-409
+    - CWE-405
+    - CWE-407
+    - CWE-776
+    rationale: 'Resource-consumption, ReDoS, unbounded allocation, decompression and asymmetric amplification,
+      algorithmic-complexity attacks, and XML entity expansion each pin resources per request for as long
+      as requests arrive; HA and restarts do not help mid-attack (and autoscaling monetizes it). A verified
+      per-client rate limit on the delivering route bounds the attacker''s consumption budget -- the correct
+      counter for this family. Note CWE-776 belongs here and NOT in CC-REQ-SIZE-LIMIT: a kilobyte of nested
+      entities expands to gigabytes, so body-size caps do not bound it.
+
+      '
+  credit:
+    lane: impact
+    metrics:
+    - MA
+    move: high-to-low
+    conditions:
+    - limit enforced on every tainted inbound route to the vulnerable surface
+    - limit threshold is sane relative to per-request worst-case cost (governed parameter, back-tested)
+    disqualifiers:
+    - amplification inside a single permitted request exceeds capacity (one zip bomb within the size limit;
+      pair with CC-REQ-SIZE-LIMIT)
+  confidence: high
+  provenance:
+    version: 1
+    status: active
+- id: CC-LIKE-EDR-BLOCK
+  title: Blocking-mode runtime protection reduces local exploitation probability
+  control:
+    name: blocking-runtime-protection
+  counters:
+    cweClasses:
+    - '*'
+    rationale: 'Blocking-mode EDR/RASP/seccomp in enforcing mode statistically reduces the probability
+      that an exploit succeeds in this environment -- it stops many variants at runtime, without any per-CVE
+      claim. It does not eliminate the chance (novel or obfuscated variants pass), so it lowers the local
+      exploitation estimate rather than flipping a trigger: adjustedEPSS = EPSS * residualFactor. Verified
+      from policy export (enforcing, not detect-only) -- config fact, no per-CVE evidence required. A
+      near-certain finding (high EPSS) survives; a marginal one may cross to NLEV, which is the correct
+      graduated behavior. Where per-CVE proof that THIS exploit is blocked exists, prefer a VEX not_affected
+      disposition (full removal), which is out of this row''s scope. Detect-only tooling earns nothing.
+
+      '
+  credit:
+    lane: likelihood
+    metrics:
+    - LEV
+    move: epss-residual
+    residualFactor: 0.85
+    conditions:
+    - blocking (enforcing) mode verified in force from policy export -- detect-only or audit mode earns
+      nothing
+    disqualifiers:
+    - 'KEV finding: frozen, no residual applies (BOD 26-04)'
+  confidence: medium
+  notes: 'residualFactor 0.85 is an illustrative governed constant pending back-test against observed
+    exploitation with blocking runtime protection present. 0.85 flips marginal findings (0.72 -> 0.61)
+    but not near-certain ones (0.99 -> 0.84), by design.
+
+    '
+  provenance:
+    version: 1
+    status: active
+- id: CC-RUN-SELINUX-CONFINE
+  title: SELinux domain confinement bounds RCE blast radius
+  control:
+    name: selinux-confinement
+  counters:
+    cweClasses:
+    - class:ACE
+    rationale: 'Mandatory access control denies a compromised process file, socket, and capability access
+      outside its domain, regardless of Unix permissions. An RCE in a confined domain reaches what the
+      policy allows, not what the user owns. The credit gate is per-process confinement, NOT distro policy
+      state: targeted policy enforcing (the STIG check) leaves most third-party applications running unconfined_t,
+      which earns nothing.
+
+      '
+  credit:
+    lane: impact
+    metrics:
+    - MC
+    - MI
+    move: high-to-low
+    conditions:
+    - SELinux enforcing (not permissive)
+    - the vulnerable process runs in a confined domain (not unconfined_t/unconfined_service_t), verified
+      from process labels or policy query
+    disqualifiers:
+    - domain policy grants broad file/network access anyway (permissive-domain or overly wide custom policy)
+  confidence: medium
+  provenance:
+    version: 1
+    status: active

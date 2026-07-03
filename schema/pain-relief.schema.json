@@ -1,0 +1,80 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "vdr-pain-relief taxonomy file",
+  "type": "object",
+  "required": ["rows"],
+  "properties": {
+    "rows": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "control", "counters", "credit", "confidence", "provenance"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^CC-[A-Z]+-[A-Z0-9-]+$"},
+          "title": {"type": "string"},
+          "control": {
+            "type": "object",
+            "required": ["name"],
+            "properties": {"name": {"type": "string"}}
+          },
+          "counters": {
+            "type": "object",
+            "required": ["cweClasses", "rationale"],
+            "properties": {
+              "cweClasses": {
+                "type": "array",
+                "minItems": 1,
+                "items": {"type": "string", "pattern": "^(CWE-[0-9]+|\\*|class:[A-Z]+)$"}
+              },
+              "rationale": {"type": "string", "minLength": 40}
+            }
+          },
+          "credit": {
+            "type": "object",
+            "required": ["lane", "metrics", "move"],
+            "properties": {
+              "lane": {"enum": ["impact", "likelihood"]},
+              "metrics": {
+                "type": "array",
+                "items": {"enum": ["MC", "MI", "MA", "LEV"]}
+              },
+              "move": {"enum": ["high-to-low", "floor-defeated", "epss-residual", "evidence-input", "none-pointer-to-vex"]},
+              "residualFactor": {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1},
+              "residualTiers": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["capability", "residualFactor"],
+                  "properties": {
+                    "capability": {"type": "string"},
+                    "residualFactor": {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1},
+                    "verify": {"type": "string"}
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "scope": {"enum": ["workload", "shared-infrastructure"]},
+              "conditions": {"type": "array", "items": {"type": "string"}},
+              "disqualifiers": {"type": "array", "items": {"type": "string"}}
+            }
+          },
+          "confidence": {"enum": ["high", "medium"]},
+          "notes": {"type": "string"},
+          "credit_note": {"type": "string"},
+          "vexBridge": {"type": "string"},
+          "visibility": {"enum": ["public", "private"]},
+          "provenance": {
+            "type": "object",
+            "required": ["version", "status"],
+            "properties": {
+              "version": {"type": "integer", "minimum": 1},
+              "status": {"enum": ["active", "deferred"]}
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  }
+}
