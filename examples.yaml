@@ -1,6 +1,6 @@
-# PAIN Relief -- public illustrative examples (6 rows).
+# PAIN Relief -- public illustrative examples (5 rows).
 # The standard, auditable row format. The maintained catalog is proprietary;
-# these six are an existence proof of the format, not the full table.
+# these are an existence proof of the format, not the full table.
 rows:
 - id: CC-NET-EGRESS-DENY
   title: Egress control impedes staged and out-of-band exploit completion
@@ -62,37 +62,6 @@ rows:
     '
   provenance:
     version: 2
-    status: active
-- id: CC-DATA-LEASTPRIV-SQL
-  title: Least-privilege single-schema credential bounds SQL injection
-  control:
-    name: least-privilege-db-grant
-  counters:
-    cweClasses:
-    - CWE-89
-    rationale: "A SQL injection executes with the application credential's authority. A grant confined\
-      \ to a single schema with no superuser, no cross-database access, and no file/extension privileges\
-      \ bounds what the payload can read or write to that schema: the injection still fires, it reaches\
-      \ less (memo row-mover, made automatic). Verified from a grants dump \u2014 pg_catalog / information_schema\
-      \ queries work the same on RDS, Cloud SQL, and self-managed engines.\n"
-  credit:
-    lane: impact
-    metrics:
-    - MC
-    - MI
-    move: high-to-low
-    conditions:
-    - grants dump artifact current within the governed refresh window
-    - no role inheritance path to broader privileges (verified in the same dump)
-    disqualifiers:
-    - 'the reachable schema IS the crown-jewel data the finding is about (scope and blast radius coincide
-      -- no credit). Operationally: least-privilege bounds where the injection can GO (other tenants/schemas,
-      system catalogs -> credential theft, file/COPY -> OS, extensions -> RCE), never the data the app
-      is entitled to HOLD; so when the asset''s own data-sensitivity is High (a data-sensitive-class datastore
-      whose own data is the target), it earns no MC/MI relief here'
-  confidence: high
-  provenance:
-    version: 1
     status: active
 - id: CC-RUN-DISTROLESS
   title: No shell in image counters command injection
