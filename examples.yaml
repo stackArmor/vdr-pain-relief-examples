@@ -85,8 +85,11 @@ rows:
     - grants dump artifact current within the governed refresh window
     - no role inheritance path to broader privileges (verified in the same dump)
     disqualifiers:
-    - the single schema IS the crown-jewel data the asset exists to protect (the bound and the blast radius
-      coincide -- no credit)
+    - 'the reachable schema IS the crown-jewel data the finding is about (scope and blast radius coincide
+      -- no credit). Operationally: least-privilege bounds where the injection can GO (other tenants/schemas,
+      system catalogs -> credential theft, file/COPY -> OS, extensions -> RCE), never the data the app
+      is entitled to HOLD; so when the asset''s own data-sensitivity is High (a data-sensitive-class datastore
+      whose own data is the target), it earns no MC/MI relief here'
   confidence: high
   provenance:
     version: 1
